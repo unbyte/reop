@@ -1,0 +1,58 @@
+{
+  "name": "reop",
+  "version": "0.1.0",
+  "author": "unbyte <i@shangyes.net>",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "fp",
+    "result",
+    "option"
+  ],
+  "repository": "git+https://github.com/unbyte/reop.git",
+  "bugs": {
+    "url": "https://github.com/unbyte/reop/issues"
+  },
+  "homepage": "https://github.com/unbyte/reop/tree/master/#readme",
+  "main": "./lib/index.cjs",
+  "module": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./lib/index.d.ts",
+        "default": "./lib/index.js"
+      },
+      "require": {
+        "types": "./lib/index.d.ts",
+        "default": "./lib/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "lib"
+  ],
+  "scripts": {
+    "prepare": "use husky install",
+    "dev": "use tsup --watch",
+    "build": "use tsup",
+    "test": "use jest",
+    "cov": "use jest --coverage",
+    "fmt": "use prettier --write \"./**/*.{ts,json}\"",
+    "lint": "use eslint \"./**/*.ts\""
+  },
+  "devDependencies": {
+    "@swc/core": "latest",
+    "@swc/jest": "latest",
+    "@types/jest": "latest",
+    "@typescript-eslint/parser": "latest",
+    "eslint": "latest",
+    "husky": "latest",
+    "jest": "latest",
+    "let-use": "latest",
+    "lint-staged": "latest",
+    "prettier": "latest",
+    "tsup": "latest",
+    "typescript": "^4.9.5"
+  }
+}

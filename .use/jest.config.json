@@ -1,0 +1,7 @@
+{
+  "transform": {
+    "^.+\\.(t|j)sx?$": "@swc/jest"
+  },
+  "rootDir": "../",
+  "collectCoverageFrom": ["src/**/*.ts", "!node_modules/**"]
+}

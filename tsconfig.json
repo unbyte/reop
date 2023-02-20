@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "es6",
+    "lib": ["es6", "es2022.error"],
+    "module": "es6",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "baseUrl": "./"
+  },
+  "include": ["src"]
+}
