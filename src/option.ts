@@ -222,11 +222,11 @@ export interface Option<T> {
   orElse(this: Option<T>, other: () => Option<T>): Option<T>
 
   /**
-   * Transforms the `Option<Promise<U>>` into a `Promise<Option<U>>`.
+   * Transforms the `Option` into a `Promise<Option>`.
    *
-   * The final `Option` will be `None` if any error raised in the `Promise<U>`.
+   * The final `Option` will be `None` if any error raised in the `Promise`.
    */
-  promise<U>(this: Option<Promise<U>>): Promise<Option<U>>
+  promise(this: Option<T>): Promise<Option<Awaited<T>>>
 
   /**
    * Behaves like {@link expect}, but using a fixed error message when it is a `None`.
@@ -341,11 +341,14 @@ class SomeImpl<T> implements Some<T> {
     return this
   }
 
-  promise<U>(): Promise<Option<U>> {
-    return (this[Value] as Promise<U>).then(
-      (val) => new SomeImpl(val),
-      () => Option.None,
-    )
+  promise(): Promise<Option<Awaited<T>>> {
+    if (isPromise(this[Value])) {
+      return this[Value].then(
+        (val) => new SomeImpl(val),
+        () => Option.None,
+      )
+    }
+    return Promise.resolve(this as Option<Awaited<T>>)
   }
 
   unwrap(): T {
@@ -440,7 +443,7 @@ class NoneImpl<T> implements None<T> {
     return other()
   }
 
-  promise<U>(): Promise<Option<U>> {
+  promise(): Promise<Option<Awaited<T>>> {
     return Promise.resolve(Option.None)
   }
 

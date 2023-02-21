@@ -163,6 +163,13 @@ describe('Result', () => {
     expect(await a.promise()).toEqual(Result.Ok(1))
     expect((await b.promise()).isErr()).toBeTruthy()
     expect((await e.promise()).isErr()).toBeTruthy()
+
+    const x = Result.Ok(1)
+    const z = Result.Err<number, number>(0)
+
+    expect(await x.promise()).toEqual(Result.Ok(1))
+    expect(await z.promise()).toEqual(Result.Err(0))
+    expect(await z.promise()).toEqual(Result.Err(0))
   })
 
   test('unwrap()', () => {

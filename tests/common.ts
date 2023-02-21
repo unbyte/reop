@@ -3,3 +3,5 @@ export class CustomError extends Error {
     super(message)
   }
 }
+
+export function expectType<T>(t: T) {}

@@ -36,7 +36,7 @@
     "prepare": "use husky install",
     "dev": "use tsup --watch",
     "build": "use tsup",
-    "test": "use jest",
+    "test": "use jest && use tsc:test-d",
     "cov": "use jest --coverage",
     "fmt": "use prettier --write \"./**/*.{ts,json}\"",
     "lint": "use eslint \"./**/*.ts\""

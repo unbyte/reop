@@ -237,9 +237,9 @@ export interface Result<T, E> {
   orElse<F>(this: Result<T, E>, f: (err: E) => Result<T, F>): Result<T, F>
 
   /**
-   * Transforms the `Result<Promise<U>, E>` into a `Promise<Result<U, E | F>>`.
+   * Transforms the `Result` into a `Promise<Result>`.
    */
-  promise<U, F>(this: Result<Promise<U>, E>): Promise<Result<U, E | F>>
+  promise<F = Error>(this: Result<T, E>): Promise<Result<Awaited<T>, E | F>>
 
   /**
    * Behaves like {@link expect}, but using a fixed error message when it is a `Err`.
@@ -366,11 +366,14 @@ class OkImpl<T, E> implements Ok<T, E> {
     return this as unknown as Result<T, F>
   }
 
-  promise<U, F>(): Promise<Result<U, E | F>> {
-    return (this[Value] as Promise<U>).then(
-      (val) => new OkImpl(val),
-      (err) => new ErrImpl(err),
-    )
+  promise<F>(): Promise<Result<Awaited<T>, E | F>> {
+    if (isPromise(this[Value])) {
+      return this[Value].then(
+        (val) => new OkImpl(val) as Result<Awaited<T>, E>,
+        (err) => new ErrImpl(err) as Result<Awaited<T>, F>,
+      )
+    }
+    return Promise.resolve(this as Result<Awaited<T>, E>)
   }
 
   unwrap(): T {
@@ -483,8 +486,8 @@ class ErrImpl<T, E> implements Err<T, E> {
     return f(this[Value])
   }
 
-  promise<U, F>(): Promise<Result<U, E | F>> {
-    return Promise.resolve(this as unknown as Result<U, E | F>)
+  promise<F>(): Promise<Result<Awaited<T>, E>> {
+    return Promise.resolve(this as Result<Awaited<T>, E>)
   }
 
   unwrap(): T {

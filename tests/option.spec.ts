@@ -142,6 +142,11 @@ describe('Option', () => {
     expect(await a.promise()).toEqual(Option.Some(1))
     expect(await b.promise()).toEqual(Option.None)
     expect(await Option.None.promise()).toEqual(Option.None)
+
+    const x = Option.Some(1)
+    const z = Option.None
+    expect(await x.promise()).toEqual(Option.Some(1))
+    expect(await z.promise()).toEqual(Option.None)
   })
 
   test('unwrap()', () => {
