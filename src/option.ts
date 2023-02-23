@@ -747,8 +747,11 @@ export const Option = {
   /**
    * Get an `Option` from executing a closure.
    * Returns `None` if the execution throws an Error (the Error will be ignored).
+   *
+   * **Note** Passing an async closure should be avoided unless it's intended to,
+   * because it always returns a `Some` as async closure always returns a `Promise`
    */
-  from<T>(fn: () => T extends Promise<any> ? never : T): Option<T> {
+  from<T>(fn: () => T): Option<T> {
     try {
       const result = fn()
       if (isPromise(result)) {
@@ -763,7 +766,7 @@ export const Option = {
    * Get an `AsyncOption` from executing a closure.
    * Returns `None` if the promise is rejected (the Error will be ignored).
    */
-  fromAsync<T>(fn: () => Promise<T>): AsyncOption<T> {
+  fromAsync<T>(fn: () => Promise<T> | T): AsyncOption<T> {
     try {
       const result = fn()
       if (isPromise(result)) {
@@ -781,9 +784,13 @@ export const Option = {
   },
   /**
    * Wraps a function to return an `Option`.
+   *
+   * **Note** Passing an async function should be avoided unless it's intended to,
+   * because the wrapped function will always return a `Some`
+   * as async function always returns a `Promise`
    */
   wrap<T, A extends any[] = any[]>(
-    fn: (...args: A) => T extends Promise<any> ? never : T,
+    fn: (...args: A) => T,
   ): (...args: A) => Option<T> {
     return (...args) => Option.from(() => fn(...args))
   },
@@ -791,7 +798,7 @@ export const Option = {
    * Wraps an async function to return an `AsyncOption`.
    */
   wrapAsync<T, A extends any[] = any[]>(
-    fn: (...args: A) => Promise<T>,
+    fn: (...args: A) => Promise<T> | T,
   ): (...args: A) => AsyncOption<T> {
     return (...args) => Option.fromAsync(() => fn(...args))
   },

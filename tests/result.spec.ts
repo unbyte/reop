@@ -329,18 +329,17 @@ describe('Result', () => {
       }).isErr(),
     ).toBeTruthy()
 
-    // Type guard prevent passing an async function, but should test it
-    expect(Result.from((async () => 1) as any).isOk()).toBeTruthy()
+    expect(Result.from(async () => 1).isOk()).toBeTruthy()
 
     expect(
-      Result.from((async () => {
+      Result.from(async () => {
         throw new Error()
-      }) as any).isOk(),
+      }).isOk(),
     ).toBeTruthy()
   })
 
   test('static fromAsync()', async () => {
-    expect(await Result.fromAsync(() => 1 as any)).toEqual(Result.Ok(1))
+    expect(await Result.fromAsync(() => 1)).toEqual(Result.Ok(1))
 
     expect(
       await Result.fromAsync(() => {
@@ -374,13 +373,12 @@ describe('Result', () => {
     })
     expect(bad('hello')).toEqual(Result.Err(0))
 
-    // Type guard prevent passing an async function, but should test it
-    const readAsync = Result.wrap((async (filename: string) => filename) as any)
+    const readAsync = Result.wrap(async (filename: string) => filename)
     expect(readAsync('hello').isOk()).toBeTruthy()
 
-    const badAsync = Result.wrap((async (filename: string) => {
+    const badAsync = Result.wrap(async (filename: string) => {
       throw 0
-    }) as any)
+    })
     expect(badAsync('hello').isOk()).toBeTruthy()
   })
 
@@ -393,8 +391,7 @@ describe('Result', () => {
     })
     expect(await badAsync('hello')).toEqual(Result.Err(0))
 
-    // Type guard prevent passing a sync function, but should test it
-    const read = Result.wrapAsync(((filename: string) => filename) as any)
+    const read = Result.wrapAsync((filename: string) => filename)
     expect(await read('hello')).toEqual(Result.Ok('hello'))
 
     const bad = Result.wrapAsync((filename: string) => {
