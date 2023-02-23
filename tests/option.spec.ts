@@ -44,6 +44,12 @@ describe('Option', () => {
     expect(await Option.None.async()).toEqual(Option.None)
   })
 
+  test('async await()', async () => {
+    expect(Option.Some(Promise.resolve(1)).async().await()).toBeInstanceOf(
+      Promise,
+    )
+  })
+
   test('expect()', () => {
     expect(() => {
       Option.Some(1).expect('unreachable')

@@ -4,5 +4,7 @@
   "trailingComma": "all",
   "singleQuote": true,
   "arrowParens": "always",
-  "bracketSpacing": true
+  "bracketSpacing": true,
+  "endOfLine": "lf",
+  "tabWidth": 2
 }

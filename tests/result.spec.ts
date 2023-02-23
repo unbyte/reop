@@ -41,6 +41,12 @@ describe('Result', () => {
     expect(await Result.Ok(Promise.reject(0)).async()).toEqual(Result.Err(0))
   })
 
+  test('async await()', async () => {
+    expect(Result.Ok(Promise.resolve(1)).async().await()).toBeInstanceOf(
+      Promise,
+    )
+  })
+
   test('err()', () => {
     expect(a.err().isNone()).toBeTruthy()
     expect(e.err().isSome()).toBeTruthy()

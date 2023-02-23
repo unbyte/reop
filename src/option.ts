@@ -260,9 +260,18 @@ export interface Option<T> {
   zip<U>(this: Option<T>, other: Option<U>): Option<[T, U]>
 }
 
+/**
+ * The result of type narrowing of {@link Result}.
+ */
 export interface None<T> extends Option<T> {}
 
+/**
+ * The result of type narrowing of {@link Result}.
+ */
 export interface Some<T> extends Option<T> {
+  /**
+   * Get the inner value safely.
+   */
   into(this: Some<T>): T
 }
 
@@ -470,64 +479,124 @@ class NoneImpl<T> implements None<T> {
 }
 
 /**
- * Async version of {@link Option}
+ * Async version of {@link Option}.
+ *
+ * There are two ways to convert {@link AsyncOption} back to {@link Option}:
+ * - {@link await} method returns a `Promise<Option<T>>`, or
+ * - `await` {@link AsyncOption} directly because it is a Promise-like object.
  */
 export interface AsyncOption<T> extends PromiseLike<Option<T>> {
+  /**
+   * Async version of {@link Option.and}.
+   */
   and<U>(this: AsyncOption<T>, other: Option<U>): AsyncOption<U>
 
+  /**
+   * Async version of {@link Option.andThen}.
+   */
   andThen<U>(
     this: AsyncOption<T>,
     f: (v: T) => Promise<Option<U>> | Option<U>,
   ): AsyncOption<U>
 
+  /**
+   * Transform the `AsyncOption` into an `Option`.
+   */
+  await(this: AsyncOption<T>): Promise<Option<T>>
+
+  /**
+   * Async version of {@link Option.expect}.
+   */
   expect(
     this: AsyncOption<T>,
     message: string | Error | (() => Error),
   ): Promise<T>
 
+  /**
+   * Async version of {@link Option.filter}.
+   */
   filter(
     this: AsyncOption<T>,
     predicate: (v: T) => Promise<boolean> | boolean,
   ): AsyncOption<T>
 
+  /**
+   * Async version of {@link Option.iter}.
+   */
   iter(this: AsyncOption<T>): Promise<IterableIterator<T>>
 
+  /**
+   * Async version of {@link Option.map}.
+   */
   map<U>(this: AsyncOption<T>, f: (v: T) => Promise<U> | U): AsyncOption<U>
 
+  /**
+   * Async version of {@link Option.mapOr}.
+   */
   mapOr<U>(
     this: AsyncOption<T>,
     def: U,
     f: (v: T) => Promise<U> | U,
   ): Promise<U>
 
+  /**
+   * Async version of {@link Option.mapOrElse}.
+   */
   mapOrElse<U>(
     this: AsyncOption<T>,
     d: () => Promise<U> | U,
     f: (v: T) => Promise<U> | U,
   ): Promise<U>
 
+  /**
+   * Async version of {@link Option.okOr}.
+   */
   okOr<E>(this: AsyncOption<T>, err: E): AsyncResult<T, E>
 
+  /**
+   * Async version of {@link Option.okOrElse}.
+   */
   okOrElse<E>(
     this: AsyncOption<T>,
     err: () => Promise<E> | E,
   ): AsyncResult<T, E>
 
+  /**
+   * Async version of {@link Option.or}.
+   */
   or(this: AsyncOption<T>, other: Option<T>): AsyncOption<T>
 
+  /**
+   * Async version of {@link Option.orElse}.
+   */
   orElse(
     this: AsyncOption<T>,
     other: () => Promise<Option<T>> | Option<T>,
   ): AsyncOption<T>
 
+  /**
+   * Async version of {@link Option.unwrap}.
+   */
   unwrap(this: AsyncOption<T>): Promise<T>
 
+  /**
+   * Async version of {@link Option.unwrapOr}.
+   */
   unwrapOr(this: AsyncOption<T>, def: T): Promise<T>
 
+  /**
+   * Async version of {@link Option.unwrapOrElse}.
+   */
   unwrapOrElse(this: AsyncOption<T>, d: () => Promise<T> | T): Promise<T>
 
+  /**
+   * Async version of {@link Option.unwrapUnchecked}.
+   */
   unwrapUnchecked(this: AsyncOption<T>): Promise<T | undefined>
 
+  /**
+   * Async version of {@link Option.zip}.
+   */
   zip<U>(this: AsyncOption<T>, other: AsyncOption<U>): AsyncOption<[T, U]>
 }
 
@@ -546,6 +615,10 @@ export class AsyncOptionImpl<T> implements AsyncOption<T> {
     // Promise awaits nested promises automatically
     // so `as any` is safe
     return new AsyncOptionImpl(this[Value].then((opt) => opt.andThen(f as any)))
+  }
+
+  await(): Promise<Option<T>> {
+    return this[Value]
   }
 
   expect(

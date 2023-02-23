@@ -276,11 +276,23 @@ export interface Result<T, E> {
   unwrapUnchecked(this: Result<T, E>): T | undefined
 }
 
+/**
+ * The result of type narrowing of {@link Result}.
+ */
 export interface Ok<T, E> extends Result<T, E> {
+  /**
+   * Get the inner value safely.
+   */
   into(this: Ok<T, E>): T
 }
 
+/**
+ * The result of type narrowing of {@link Result}.
+ */
 export interface Err<T, E> extends Result<T, E> {
+  /**
+   * Get the inner error safely.
+   */
   into(this: Err<T, E>): E
 }
 
@@ -518,82 +530,140 @@ class ErrImpl<T, E> implements Err<T, E> {
 }
 
 /**
- * Async version of {@link Result}
+ * Async version of {@link Result}.
+ *
+ * There are two ways to convert {@link AsyncResult} back to {@link Result}:
+ * - {@link await} method returns a `Promise<Result<T, E>>`, or
+ * - `await` {@link AsyncResult} directly because it is a Promise-like object.
  */
 export interface AsyncResult<T, E> extends PromiseLike<Result<T, E>> {
+  /**
+   * Async version of {@link Result.and}.
+   */
   and<U>(this: AsyncResult<T, E>, other: Result<U, E>): AsyncResult<U, E>
 
+  /**
+   * Async version of {@link Result.andThen}.
+   */
   andThen<U>(
     this: AsyncResult<T, E>,
     f: (v: T) => Promise<Result<U, E>> | Result<U, E>,
   ): AsyncResult<U, E>
 
+  /**
+   * Transform the `AsyncResult` into a `Result`.
+   */
+  await(this: AsyncResult<T, E>): Promise<Result<T, E>>
+
+  /**
+   * Async version of {@link Result.err}.
+   */
   err(this: AsyncResult<T, E>): AsyncOption<E>
 
   /**
-   * When is `Ok`:
-   * - returns the contained value.
-   *
-   * When is `Err`:
-   * - throws with `new Error()` if the passed {@link message} is string
-   * - throws the passed custom Error if the {@link message} is Error
+   * Async version of {@link Result.expect}.
    */
   expect(
     this: AsyncResult<T, E>,
     message: string | Error | ((err: E) => Error),
   ): Promise<T>
 
+  /**
+   * Async version of {@link Result.expectErr}.
+   */
   expectErr(
     this: AsyncResult<T, E>,
     message: string | Error | (() => Error),
   ): Promise<E>
 
+  /**
+   * Async version of {@link Result.iter}.
+   */
   iter(this: AsyncResult<T, E>): Promise<IterableIterator<T>>
 
+  /**
+   * Async version of {@link Result.map}.
+   */
   map<U>(
     this: AsyncResult<T, E>,
     f: (v: T) => Promise<U> | U,
   ): AsyncResult<U, E>
 
+  /**
+   * Async version of {@link Result.mapErr}.
+   */
   mapErr<F>(
     this: AsyncResult<T, E>,
     f: (e: E) => Promise<F> | F,
   ): AsyncResult<T, F>
 
+  /**
+   * Async version of {@link Result.mapOr}.
+   */
   mapOr<U>(
     this: AsyncResult<T, E>,
     def: U,
     f: (v: T) => Promise<U> | U,
   ): Promise<U>
 
+  /**
+   * Async version of {@link Result.mapOrElse}.
+   */
   mapOrElse<U>(
     this: AsyncResult<T, E>,
     def: (err: E) => Promise<U> | U,
     f: (v: T) => Promise<U> | U,
   ): Promise<U>
 
+  /**
+   * Async version of {@link Result.ok}.
+   */
   ok(this: AsyncResult<T, E>): AsyncOption<T>
 
+  /**
+   * Async version of {@link Result.or}.
+   */
   or<F>(this: AsyncResult<T, E>, other: Result<T, F>): AsyncResult<T, F>
 
+  /**
+   * Async version of {@link Result.orElse}.
+   */
   orElse<F>(
     this: AsyncResult<T, E>,
     f: (err: E) => Promise<Result<T, F>> | Result<T, F>,
   ): AsyncResult<T, F>
 
+  /**
+   * Async version of {@link Result.unwrap}.
+   */
   unwrap(this: AsyncResult<T, E>): Promise<T>
 
+  /**
+   * Async version of {@link Result.unwrapErr}.
+   */
   unwrapErr(this: AsyncResult<T, E>): Promise<E>
 
+  /**
+   * Async version of {@link Result.unwrapErrUnchecked}.
+   */
   unwrapErrUnchecked(this: AsyncResult<T, E>): Promise<E | undefined>
 
+  /**
+   * Async version of {@link Result.unwrapOr}.
+   */
   unwrapOr(this: AsyncResult<T, E>, def: T): Promise<T>
 
+  /**
+   * Async version of {@link Result.unwrapOrElse}.
+   */
   unwrapOrElse(
     this: AsyncResult<T, E>,
     def: (err: E) => Promise<T> | T,
   ): Promise<T>
 
+  /**
+   * Async version of {@link Result.unwrapUnchecked}.
+   */
   unwrapUnchecked(this: AsyncResult<T, E>): Promise<T | undefined>
 }
 
@@ -614,6 +684,10 @@ export class AsyncResultImpl<T, E> implements AsyncResult<T, E> {
     // Promise awaits nested promises automatically
     // so `as any` is safe
     return new AsyncResultImpl(this[Value].then((opt) => opt.andThen(f as any)))
+  }
+
+  await(): Promise<Result<T, E>> {
+    return this[Value]
   }
 
   err(): AsyncOption<E> {

@@ -54,6 +54,6 @@
     "lint-staged": "latest",
     "prettier": "latest",
     "tsup": "latest",
-    "typescript": "^4.9.5"
+    "typescript": "^4.9"
   }
 }
