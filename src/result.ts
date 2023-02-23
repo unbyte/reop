@@ -828,11 +828,13 @@ export const Result = {
    * Get a `Result` from executing a closure.
    * Returns `Err` if the execution throws an Error.
    */
-  from<T, E = Error>(fn: () => T): Result<T, E> {
+  from<T, E = Error>(
+    fn: () => T extends Promise<any> ? never : T,
+  ): Result<T, E> {
     try {
       const result = fn()
       if (isPromise(result)) {
-        result.catch(noop)
+        result.then(noop, noop)
       }
       return new OkImpl(result)
     } catch (e) {
@@ -843,14 +845,16 @@ export const Result = {
    * Get an `AsyncResult` from executing a closure.
    * Returns `Err` if the promise is rejected.
    */
-  fromAsync<T, E = Error>(fn: () => Promise<T>): AsyncResult<T, E> {
+  fromAsync<T, E = Error, F = Error>(
+    fn: () => Promise<T>,
+  ): AsyncResult<T, E | F> {
     try {
       const result = fn()
       if (isPromise(result)) {
         return new AsyncResultImpl(
           result.then(
-            (res) => Result.Ok(res),
-            (err) => Result.Err(err),
+            (res: T) => Result.Ok(res),
+            (err: F) => Result.Err(err),
           ),
         )
       }
@@ -858,5 +862,21 @@ export const Result = {
     } catch (e) {
       return new AsyncResultImpl(Promise.resolve(Result.Err(e as E)))
     }
+  },
+  /**
+   * Wraps a function to return an `Result`.
+   */
+  wrap<T, E = Error, A extends any[] = any[]>(
+    fn: (...args: A) => T extends Promise<any> ? never : T,
+  ): (...args: A) => Result<T, E> {
+    return (...args) => Result.from(() => fn(...args))
+  },
+  /**
+   * Wraps an async function to return an `AsyncResult`.
+   */
+  wrapAsync<T, E = Error, F = Error, A extends any[] = any[]>(
+    fn: (...args: A) => Promise<T>,
+  ): (...args: A) => AsyncResult<T, E | F> {
+    return (...args) => Result.fromAsync(() => fn(...args))
   },
 } as const

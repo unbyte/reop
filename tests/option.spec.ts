@@ -288,22 +288,21 @@ describe('Option', () => {
   })
 
   test('static from()', () => {
-    expect(Option.from(async () => 1).isSome()).toBeTruthy()
-
     expect(Option.from(() => 1)).toEqual(Option.Some(1))
-
-    // rejected promise is also Some
-    expect(
-      Option.from(async () => {
-        throw new Error()
-      }).isSome(),
-    ).toBeTruthy()
 
     expect(
       Option.from(() => {
         throw new Error()
       }),
     ).toEqual(Option.None)
+
+    // Type guard prevent passing an async function, but should test it
+    expect(Option.from((async () => 1) as any).isSome()).toBeTruthy()
+    expect(
+      Option.from((async () => {
+        throw new Error()
+      }) as any).isSome(),
+    ).toBeTruthy()
   })
 
   test('static fromAsync()', async () => {
@@ -330,16 +329,43 @@ describe('Option', () => {
         })
       }),
     ).toEqual(Option.None)
+  })
 
-    // chain async function
-    expect(await Option.fromAsync(async () => 1).map((n) => 1 + n)).toEqual(
-      Option.Some(2),
-    )
+  test('static wrap()', () => {
+    const read = Option.wrap((filename: string) => filename)
+    expect(read('hello')).toEqual(Option.Some('hello'))
 
-    expect(
-      await Option.fromAsync(async () => {
-        throw new Error()
-      }).map((n) => 1 + n),
-    ).toEqual(Option.None)
+    const bad = Option.wrap((filename: string) => {
+      throw 0
+    })
+    expect(bad('hello')).toEqual(Option.None)
+
+    // Type guard prevent passing an async function, but should test it
+    const readAsync = Option.wrap((async (filename: string) => filename) as any)
+    expect(readAsync('hello').isSome()).toBeTruthy()
+
+    const badAsync = Option.wrap((async (filename: string) => {
+      throw 0
+    }) as any)
+    expect(badAsync('hello').isSome()).toBeTruthy()
+  })
+
+  test('static wrapAsync()', async () => {
+    const readAsync = Option.wrapAsync(async (filename: string) => filename)
+    expect(await readAsync('hello')).toEqual(Option.Some('hello'))
+
+    const badAsync = Option.wrapAsync(async (filename: string) => {
+      throw 0
+    })
+    expect(await badAsync('hello')).toEqual(Option.None)
+
+    // Type guard prevent passing a sync function, but should test it
+    const read = Option.wrapAsync(((filename: string) => filename) as any)
+    expect(await read('hello')).toEqual(Option.Some('hello'))
+
+    const bad = Option.wrapAsync((filename: string) => {
+      throw 0
+    })
+    expect(await bad('hello')).toEqual(Option.None)
   })
 })

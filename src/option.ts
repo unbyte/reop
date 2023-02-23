@@ -748,11 +748,11 @@ export const Option = {
    * Get an `Option` from executing a closure.
    * Returns `None` if the execution throws an Error (the Error will be ignored).
    */
-  from<T>(fn: () => T): Option<T> {
+  from<T>(fn: () => T extends Promise<any> ? never : T): Option<T> {
     try {
       const result = fn()
       if (isPromise(result)) {
-        result.catch(noop)
+        result.then(noop, noop)
       }
       return new SomeImpl(result)
     } catch {
@@ -778,5 +778,21 @@ export const Option = {
     } catch {
       return new AsyncOptionImpl(Promise.resolve(Option.None))
     }
+  },
+  /**
+   * Wraps a function to return an `Option`.
+   */
+  wrap<T, A extends any[] = any[]>(
+    fn: (...args: A) => T extends Promise<any> ? never : T,
+  ): (...args: A) => Option<T> {
+    return (...args) => Option.from(() => fn(...args))
+  },
+  /**
+   * Wraps an async function to return an `AsyncOption`.
+   */
+  wrapAsync<T, A extends any[] = any[]>(
+    fn: (...args: A) => Promise<T>,
+  ): (...args: A) => AsyncOption<T> {
+    return (...args) => Option.fromAsync(() => fn(...args))
   },
 } as const
