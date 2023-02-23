@@ -1,4 +1,4 @@
-import { Option } from './option'
+import { AsyncOption, AsyncOptionImpl, Option } from './option'
 import {
   createIteratorOn,
   getEmptyIterator,
@@ -135,6 +135,11 @@ export interface Result<T, E> {
   andThen<U>(this: Result<T, E>, f: (v: T) => Result<U, E>): Result<U, E>
 
   /**
+   * Transforms the `Result` into a `AsyncResult`.
+   */
+  async<F = Error>(this: Result<T, E>): AsyncResult<Awaited<T>, E | F>
+
+  /**
    * Converts from `Result<T, E>` to `Option<E>`.
    */
   err(this: Result<T, E>): Option<E>
@@ -237,11 +242,6 @@ export interface Result<T, E> {
   orElse<F>(this: Result<T, E>, f: (err: E) => Result<T, F>): Result<T, F>
 
   /**
-   * Transforms the `Result` into a `Promise<Result>`.
-   */
-  promise<F = Error>(this: Result<T, E>): Promise<Result<Awaited<T>, E | F>>
-
-  /**
    * Behaves like {@link expect}, but using a fixed error message when it is a `Err`.
    */
   unwrap(this: Result<T, E>): T
@@ -299,6 +299,18 @@ class OkImpl<T, E> implements Ok<T, E> {
 
   andThen<U>(f: (v: T) => Result<U, E>): Result<U, E> {
     return f(this[Value])
+  }
+
+  async<F>(): AsyncResult<Awaited<T>, E | F> {
+    if (isPromise(this[Value])) {
+      return new AsyncResultImpl(
+        this[Value].then(
+          (val: Awaited<T>) => new OkImpl(val),
+          (err: F) => new ErrImpl(err) as unknown as Result<Awaited<T>, F>,
+        ),
+      )
+    }
+    return new AsyncResultImpl(Promise.resolve(this as Result<Awaited<T>, E>))
   }
 
   err(): Option<E> {
@@ -366,16 +378,6 @@ class OkImpl<T, E> implements Ok<T, E> {
     return this as unknown as Result<T, F>
   }
 
-  promise<F>(): Promise<Result<Awaited<T>, E | F>> {
-    if (isPromise(this[Value])) {
-      return this[Value].then(
-        (val) => new OkImpl(val) as Result<Awaited<T>, E>,
-        (err) => new ErrImpl(err) as Result<Awaited<T>, F>,
-      )
-    }
-    return Promise.resolve(this as Result<Awaited<T>, E>)
-  }
-
   unwrap(): T {
     return this[Value]
   }
@@ -414,6 +416,10 @@ class ErrImpl<T, E> implements Err<T, E> {
 
   andThen<U>(f: (v: T) => Result<U, E>): Result<U, E> {
     return this as unknown as Result<U, E>
+  }
+
+  async<F>(): AsyncResult<Awaited<T>, E> {
+    return new AsyncResultImpl(Promise.resolve(this as Result<Awaited<T>, E>))
   }
 
   err(): Option<E> {
@@ -486,10 +492,6 @@ class ErrImpl<T, E> implements Err<T, E> {
     return f(this[Value])
   }
 
-  promise<F>(): Promise<Result<Awaited<T>, E>> {
-    return Promise.resolve(this as Result<Awaited<T>, E>)
-  }
-
   unwrap(): T {
     return this.expect('expect an Ok, but got an Err')
   }
@@ -516,6 +518,216 @@ class ErrImpl<T, E> implements Err<T, E> {
 }
 
 /**
+ * Async version of {@link Result}
+ */
+export interface AsyncResult<T, E> extends PromiseLike<Result<T, E>> {
+  and<U>(this: AsyncResult<T, E>, other: Result<U, E>): AsyncResult<U, E>
+
+  andThen<U>(
+    this: AsyncResult<T, E>,
+    f: (v: T) => Promise<Result<U, E>> | Result<U, E>,
+  ): AsyncResult<U, E>
+
+  err(this: AsyncResult<T, E>): AsyncOption<E>
+
+  /**
+   * When is `Ok`:
+   * - returns the contained value.
+   *
+   * When is `Err`:
+   * - throws with `new Error()` if the passed {@link message} is string
+   * - throws the passed custom Error if the {@link message} is Error
+   */
+  expect(
+    this: AsyncResult<T, E>,
+    message: string | Error | ((err: E) => Error),
+  ): Promise<T>
+
+  expectErr(
+    this: AsyncResult<T, E>,
+    message: string | Error | (() => Error),
+  ): Promise<E>
+
+  iter(this: AsyncResult<T, E>): Promise<IterableIterator<T>>
+
+  map<U>(
+    this: AsyncResult<T, E>,
+    f: (v: T) => Promise<U> | U,
+  ): AsyncResult<U, E>
+
+  mapErr<F>(
+    this: AsyncResult<T, E>,
+    f: (e: E) => Promise<F> | F,
+  ): AsyncResult<T, F>
+
+  mapOr<U>(
+    this: AsyncResult<T, E>,
+    def: U,
+    f: (v: T) => Promise<U> | U,
+  ): Promise<U>
+
+  mapOrElse<U>(
+    this: AsyncResult<T, E>,
+    def: (err: E) => Promise<U> | U,
+    f: (v: T) => Promise<U> | U,
+  ): Promise<U>
+
+  ok(this: AsyncResult<T, E>): AsyncOption<T>
+
+  or<F>(this: AsyncResult<T, E>, other: Result<T, F>): AsyncResult<T, F>
+
+  orElse<F>(
+    this: AsyncResult<T, E>,
+    f: (err: E) => Promise<Result<T, F>> | Result<T, F>,
+  ): AsyncResult<T, F>
+
+  unwrap(this: AsyncResult<T, E>): Promise<T>
+
+  unwrapErr(this: AsyncResult<T, E>): Promise<E>
+
+  unwrapErrUnchecked(this: AsyncResult<T, E>): Promise<E | undefined>
+
+  unwrapOr(this: AsyncResult<T, E>, def: T): Promise<T>
+
+  unwrapOrElse(
+    this: AsyncResult<T, E>,
+    def: (err: E) => Promise<T> | T,
+  ): Promise<T>
+
+  unwrapUnchecked(this: AsyncResult<T, E>): Promise<T | undefined>
+}
+
+export class AsyncResultImpl<T, E> implements AsyncResult<T, E> {
+  private readonly [Value]: Promise<Result<T, E>>
+
+  constructor(value: Promise<Result<T, E>>) {
+    this[Value] = value
+  }
+
+  and<U>(other: Result<U, E>): AsyncResult<U, E> {
+    return new AsyncResultImpl(this[Value].then((opt) => opt.and(other)))
+  }
+
+  andThen<U>(
+    f: (v: T) => Promise<Result<U, E>> | Result<U, E>,
+  ): AsyncResult<U, E> {
+    // Promise awaits nested promises automatically
+    // so `as any` is safe
+    return new AsyncResultImpl(this[Value].then((opt) => opt.andThen(f as any)))
+  }
+
+  err(): AsyncOption<E> {
+    return new AsyncOptionImpl(this[Value].then((res) => res.err()))
+  }
+
+  expect(
+    message: string | Error | ((err: E) => Error),
+    ref = this.expect,
+  ): Promise<T> {
+    return this[Value].then((res) => {
+      if (res instanceof OkImpl) return res.into()
+      else if (res instanceof ErrImpl) return res.expect(message, ref)
+      // unreachable
+    })
+  }
+
+  expectErr(
+    message: string | Error | (() => Error),
+    ref = this.expectErr,
+  ): Promise<E> {
+    return this[Value].then((res) => {
+      if (res instanceof ErrImpl) return res.into()
+      else if (res instanceof OkImpl) return res.expectErr(message, ref)
+      // unreachable
+    })
+  }
+
+  iter(): Promise<IterableIterator<T>> {
+    return this[Value].then((res) => res.iter())
+  }
+
+  map<U>(f: (v: T) => Promise<U> | U): AsyncResult<U, E> {
+    return new AsyncResultImpl(
+      this[Value].then(async (res) => {
+        if (res.isOk()) return Result.Ok(await f(res.into()))
+        return res as unknown as Result<U, E>
+      }),
+    )
+  }
+
+  mapErr<F>(f: (e: E) => Promise<F> | F): AsyncResult<T, F> {
+    return new AsyncResultImpl(
+      this[Value].then(async (res) => {
+        if (res.isErr()) return Result.Err(await f(res.into()))
+        return res as unknown as Result<T, F>
+      }),
+    )
+  }
+
+  mapOr<U>(def: U, f: (v: T) => Promise<U> | U): Promise<U> {
+    return this[Value].then((res) => res.mapOr(def, f))
+  }
+
+  mapOrElse<U>(
+    def: (err: E) => Promise<U> | U,
+    f: (v: T) => Promise<U> | U,
+  ): Promise<U> {
+    return this[Value].then((res) => res.mapOrElse(def, f))
+  }
+
+  ok(): AsyncOption<T> {
+    return new AsyncOptionImpl(this[Value].then((res) => res.ok()))
+  }
+
+  or<F>(other: Result<T, F>): AsyncResult<T, F> {
+    return new AsyncResultImpl(this[Value].then((res) => res.or(other)))
+  }
+
+  orElse<F>(
+    f: (err: E) => Promise<Result<T, F>> | Result<T, F>,
+  ): AsyncResult<T, F> {
+    // Promise awaits nested promises automatically
+    // so `as any` is safe
+    return new AsyncResultImpl(this[Value].then((res) => res.orElse(f as any)))
+  }
+
+  then<R>(
+    onfulfilled?:
+      | ((value: Result<T, E>) => PromiseLike<R> | R)
+      | undefined
+      | null,
+  ): PromiseLike<R> {
+    return this[Value].then(onfulfilled)
+  }
+
+  unwrap(): Promise<T> {
+    return this.expect('expect an Ok, but got an Err', this.unwrap)
+  }
+
+  unwrapErr(): Promise<E> {
+    return this.expectErr('expect an Err, but got an Ok', this.unwrapErr)
+  }
+
+  unwrapErrUnchecked(): Promise<E | undefined> {
+    return this[Value].then((res) => res.unwrapErrUnchecked())
+  }
+
+  unwrapOr(def: T): Promise<T> {
+    return this[Value].then((res) => res.unwrapOr(def))
+  }
+
+  unwrapOrElse(def: (err: E) => Promise<T> | T): Promise<T> {
+    // Promise awaits nested promises automatically
+    // so `as any` is safe
+    return this[Value].then((res) => res.unwrapOrElse(def as any))
+  }
+
+  unwrapUnchecked(): Promise<T | undefined> {
+    return this[Value].then((res) => res.unwrapUnchecked())
+  }
+}
+
+/**
  * The Result type.
  * See the interface {@link Result} for more.
  */
@@ -534,10 +746,15 @@ export const Result = {
   is: (val: unknown): val is Result<any, any> =>
     val instanceof OkImpl || val instanceof ErrImpl,
   /**
-   * Get an `Result` from executing a closure.
-   * Returns `Err` when the execution throws an Error.
+   * Check if a value is an `AsyncResult`
    */
-  wrap<T, E = Error>(fn: () => T): Result<T, E> {
+  isAsync: (val: unknown): val is AsyncResult<any, any> =>
+    val instanceof AsyncResultImpl,
+  /**
+   * Get a `Result` from executing a closure.
+   * Returns `Err` if the execution throws an Error.
+   */
+  from<T, E = Error>(fn: () => T): Result<T, E> {
     try {
       const result = fn()
       if (isPromise(result)) {
@@ -546,6 +763,26 @@ export const Result = {
       return new OkImpl(result)
     } catch (e) {
       return new ErrImpl(e as E)
+    }
+  },
+  /**
+   * Get an `AsyncResult` from executing a closure.
+   * Returns `Err` if the promise is rejected.
+   */
+  fromAsync<T, E = Error>(fn: () => Promise<T>): AsyncResult<T, E> {
+    try {
+      const result = fn()
+      if (isPromise(result)) {
+        return new AsyncResultImpl(
+          result.then(
+            (res) => Result.Ok(res),
+            (err) => Result.Err(err),
+          ),
+        )
+      }
+      return new AsyncResultImpl(Promise.resolve(Result.Ok(result)))
+    } catch (e) {
+      return new AsyncResultImpl(Promise.resolve(Result.Err(e as E)))
     }
   },
 } as const

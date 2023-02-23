@@ -2,22 +2,46 @@ import { Option } from '../src'
 import { CustomError } from './common'
 
 describe('Option', () => {
-  test('and()', () => {
-    const a = Option.Some(1)
-    const b = Option.Some(2)
+  const a = Option.Some(1)
+  const b = Option.Some(2)
 
+  test('and()', () => {
     expect(a.and(b)).toEqual(b)
     expect(a.and(Option.None)).toEqual(Option.None)
 
     expect(Option.None.and(a)).toEqual(Option.None)
   })
 
-  test('andThen()', () => {
-    const a = Option.Some(1)
+  test('async and()', async () => {
+    expect(await a.async().and(b)).toEqual(b)
+    expect(await a.async().and(Option.None)).toEqual(Option.None)
 
+    expect(await Option.None.async().and(a)).toEqual(Option.None)
+  })
+
+  test('andThen()', () => {
     expect(a.andThen((n) => Option.Some(n + 1))).toEqual(Option.Some(2))
     expect(a.andThen(() => Option.None)).toEqual(Option.None)
     expect(Option.None.andThen((n) => Option.Some(n + 1))).toEqual(Option.None)
+  })
+
+  test('async andThen()', async () => {
+    expect(await a.async().andThen((n) => Option.Some(n + 1))).toEqual(
+      Option.Some(2),
+    )
+    expect(await a.async().andThen(() => Option.None)).toEqual(Option.None)
+    expect(
+      await Option.None.async().andThen((n) => Option.Some(n + 1)),
+    ).toEqual(Option.None)
+  })
+
+  test('async()', async () => {
+    const a = Option.Some(Promise.resolve(1))
+    const b = Option.Some(Promise.reject())
+
+    expect(await a.async()).toEqual(Option.Some(1))
+    expect(await b.async()).toEqual(Option.None)
+    expect(await Option.None.async()).toEqual(Option.None)
   })
 
   test('expect()', () => {
@@ -38,12 +62,30 @@ describe('Option', () => {
     }).toThrow(CustomError)
   })
 
-  test('filter()', () => {
-    const a = Option.Some(1)
+  test('async expect()', async () => {
+    await expect(a.async().expect('unreachable')).resolves.not.toBeUndefined()
 
+    await expect(Option.None.async().expect('boom')).rejects.not.toBeUndefined()
+
+    await expect(
+      Option.None.async().expect(new CustomError('custom error')),
+    ).rejects.not.toBeUndefined()
+
+    await expect(
+      Option.None.async().expect(() => new CustomError('custom error')),
+    ).rejects.not.toBeUndefined()
+  })
+
+  test('filter()', () => {
     expect(a.filter((n) => n > 1)).toEqual(Option.None)
     expect(a.filter((n) => n <= 1)).toEqual(a)
     expect(Option.None.filter(() => true)).toEqual(Option.None)
+  })
+
+  test('async filter()', async () => {
+    expect(await a.async().filter(async (n) => n > 1)).toEqual(Option.None)
+    expect(await a.async().filter(async (n) => n <= 1)).toEqual(a)
+    expect(await Option.None.async().filter(() => true)).toEqual(Option.None)
   })
 
   test('flatten()', () => {
@@ -56,42 +98,54 @@ describe('Option', () => {
   })
 
   test('isNone()', () => {
-    expect(Option.Some(0).isNone()).toBe(false)
+    expect(a.isNone()).toBe(false)
     expect(Option.None.isNone()).toBe(true)
   })
 
   test('isSome() && Some.into()', () => {
-    const a = Option.Some(0)
-
     expect(a.isSome()).toBe(true)
 
     // type guard
     if (a.isSome()) {
-      expect(a.into()).toBe(0)
+      expect(a.into()).toBe(1)
     }
 
     expect(Option.None.isSome()).toBe(false)
   })
 
   test('iter()', () => {
-    expect(Array.from(Option.Some(1).iter())).toEqual([1])
-    expect(Array.from(Option.Some('1').iter())).toEqual(['1'])
+    expect(Array.from(a.iter())).toEqual([1])
     expect(Array.from(Option.None.iter())).toEqual([])
   })
 
+  test('async iter()', async () => {
+    expect(Array.from(await a.async().iter())).toEqual([1])
+    expect(Array.from(await Option.None.async().iter())).toEqual([])
+  })
+
   test('map()', () => {
-    expect(Option.Some(1).map((n) => n + 1)).toEqual(Option.Some(2))
+    expect(a.map((n) => n + 1)).toEqual(Option.Some(2))
     expect(Option.None.map((n) => n + 1)).toEqual(Option.None)
   })
 
+  test('async map()', async () => {
+    expect(await a.async().map((n) => n + 1)).toEqual(Option.Some(2))
+    expect(await Option.None.async().map((n) => n + 1)).toEqual(Option.None)
+  })
+
   test('mapOr()', () => {
-    expect(Option.Some(1).mapOr(0, (n) => n + 1)).toBe(2)
+    expect(a.mapOr(0, (n) => n + 1)).toBe(2)
     expect(Option.None.mapOr(0, (n) => n + 1)).toBe(0)
+  })
+
+  test('async mapOr()', async () => {
+    expect(await a.async().mapOr(0, (n) => n + 1)).toBe(2)
+    expect(await Option.None.async().mapOr(0, (n) => n + 1)).toBe(0)
   })
 
   test('mapOrElse()', () => {
     expect(
-      Option.Some(1).mapOrElse(
+      a.mapOrElse(
         () => 0,
         (n) => n + 1,
       ),
@@ -104,132 +158,182 @@ describe('Option', () => {
     ).toBe(0)
   })
 
+  test('async mapOrElse()', async () => {
+    expect(
+      await a.async().mapOrElse(
+        () => 0,
+        (n) => n + 1,
+      ),
+    ).toBe(2)
+    expect(
+      await Option.None.async().mapOrElse(
+        () => 0,
+        (n) => n + 1,
+      ),
+    ).toBe(0)
+  })
+
   test('okOr()', () => {
-    expect(Option.Some(1).okOr(new Error()).isOk()).toBeTruthy()
+    expect(a.okOr(new Error()).isOk()).toBeTruthy()
     expect(Option.None.okOr(new Error()).isErr()).toBeTruthy()
   })
 
+  test('async okOr()', async () => {
+    expect((await a.async().okOr(new Error())).isOk()).toBeTruthy()
+    expect((await Option.None.async().okOr(new Error())).isErr()).toBeTruthy()
+  })
+
   test('okOrElse()', () => {
-    expect(
-      Option.Some(1)
-        .okOrElse(() => new Error())
-        .isOk(),
-    ).toBeTruthy()
+    expect(a.okOrElse(() => new Error()).isOk()).toBeTruthy()
     expect(Option.None.okOrElse(() => new Error()).isErr()).toBeTruthy()
   })
 
-  test('or()', () => {
-    const a = Option.Some(1)
-    const b = Option.Some(2)
+  test('async okOrElse()', async () => {
+    expect((await a.async().okOrElse(() => new Error())).isOk()).toBeTruthy()
+    expect(
+      (await Option.None.async().okOrElse(() => new Error())).isErr(),
+    ).toBeTruthy()
+  })
 
+  test('or()', () => {
     expect(a.or(b)).toEqual(a)
     expect(Option.None.or(a)).toEqual(a)
     expect(Option.None.or(b).or(a)).toEqual(b)
   })
 
-  test('orElse()', () => {
-    const a = Option.Some(1)
-    const b = Option.Some(2)
+  test('async or()', async () => {
+    expect(await a.async().or(b)).toEqual(a)
+    expect(await Option.None.async().or(a)).toEqual(a)
+    expect(await Option.None.async().or(b).or(a)).toEqual(b)
+  })
 
+  test('orElse()', () => {
     expect(a.orElse(() => b)).toEqual(a)
     expect(Option.None.orElse(() => a)).toEqual(a)
   })
 
-  test('promise()', async () => {
-    const a = Option.Some(Promise.resolve(1))
-    const b = Option.Some(Promise.reject())
-
-    expect(await a.promise()).toEqual(Option.Some(1))
-    expect(await b.promise()).toEqual(Option.None)
-    expect(await Option.None.promise()).toEqual(Option.None)
-
-    const x = Option.Some(1)
-    const z = Option.None
-    expect(await x.promise()).toEqual(Option.Some(1))
-    expect(await z.promise()).toEqual(Option.None)
+  test('async orElse()', async () => {
+    expect(await a.async().orElse(() => b)).toEqual(a)
+    expect(await Option.None.async().orElse(() => a)).toEqual(a)
   })
 
   test('unwrap()', () => {
-    expect(Option.Some(1).unwrap()).toBe(1)
+    expect(a.unwrap()).toBe(1)
     expect(() => Option.None.unwrap()).toThrow()
   })
 
+  test('async unwrap()', async () => {
+    expect(await a.async().unwrap()).toBe(1)
+    await expect(Option.None.async().unwrap()).rejects.not.toBeUndefined()
+  })
+
   test('unwrapOr()', () => {
-    expect(Option.Some(1).unwrapOr(2)).toBe(1)
+    expect(a.unwrapOr(2)).toBe(1)
     expect(Option.None.unwrapOr(2)).toBe(2)
   })
 
+  test('async unwrapOr()', async () => {
+    expect(await a.async().unwrapOr(2)).toBe(1)
+    expect(await Option.None.async().unwrapOr(2)).toBe(2)
+  })
+
   test('unwrapOrElse()', () => {
-    expect(Option.Some(1).unwrapOrElse(() => 2)).toBe(1)
+    expect(a.unwrapOrElse(() => 2)).toBe(1)
     expect(Option.None.unwrapOrElse(() => 2)).toBe(2)
   })
 
+  test('async unwrapOrElse()', async () => {
+    expect(await a.async().unwrapOrElse(async () => 2)).toBe(1)
+    expect(await Option.None.async().unwrapOrElse(() => 2)).toBe(2)
+  })
+
   test('unwrapUnchecked()', () => {
-    expect(Option.Some(1).unwrapUnchecked()).toBe(1)
+    expect(a.unwrapUnchecked()).toBe(1)
     expect(Option.None.unwrapUnchecked()).toBeUndefined()
   })
 
-  test('zip()', () => {
-    const a = Option.Some(1)
-    const b = Option.Some(2)
+  test('async unwrapUnchecked()', async () => {
+    expect(await a.async().unwrapUnchecked()).toBe(1)
+    expect(await Option.None.async().unwrapUnchecked()).toBeUndefined()
+  })
 
+  test('zip()', () => {
     expect(a.zip(b)).toEqual(Option.Some([1, 2]))
     expect(a.zip(Option.None)).toEqual(Option.None)
     expect(Option.None.zip(b)).toEqual(Option.None)
   })
 
-  test('static is()', () => {
-    expect(Option.is(1)).toBeFalsy()
-    expect(Option.is(Option.None)).toBeTruthy()
-    expect(Option.is(Option.Some(1))).toBeTruthy()
+  test('async zip()', async () => {
+    expect(await a.async().zip(b.async())).toEqual(Option.Some([1, 2]))
+    expect(await a.async().zip(Option.None.async())).toEqual(Option.None)
+    expect(await Option.None.async().zip(b.async())).toEqual(Option.None)
   })
 
-  test('static wrap()', async () => {
-    // sync functions
-    expect(Option.wrap(() => 1)).toEqual(Option.Some(1))
+  test('static is()', () => {
+    expect(Option.is(1)).toBeFalsy()
+    expect(Option.is(a)).toBeTruthy()
+    expect(Option.is(Option.None)).toBeTruthy()
+  })
 
+  test('static isAsync()', () => {
+    expect(Option.isAsync(1)).toBeFalsy()
+    expect(Option.isAsync(a.async())).toBeTruthy()
+    expect(Option.isAsync(Option.None.async())).toBeTruthy()
+  })
+
+  test('static from()', () => {
+    expect(Option.from(async () => 1).isSome()).toBeTruthy()
+
+    expect(Option.from(() => 1)).toEqual(Option.Some(1))
+
+    // rejected promise is also Some
     expect(
-      Option.wrap(() => {
-        throw new Error()
-      }),
-    ).toEqual(Option.None)
-
-    // async functions
-    expect(await Option.wrap(async () => 1).promise()).toEqual(Option.Some(1))
-
-    expect(
-      Option.wrap(async () => {
+      Option.from(async () => {
         throw new Error()
       }).isSome(),
     ).toBeTruthy()
 
     expect(
-      await Option.wrap(async () => {
+      Option.from(() => {
         throw new Error()
-      }).promise(),
+      }),
+    ).toEqual(Option.None)
+  })
+
+  test('static fromAsync()', async () => {
+    expect(await Option.fromAsync(() => 1 as any)).toEqual(Option.Some(1))
+
+    expect(
+      await Option.fromAsync(() => {
+        throw 0
+      }),
+    ).toEqual(Option.None)
+
+    expect(await Option.fromAsync(async () => 1)).toEqual(Option.Some(1))
+
+    expect(
+      await Option.fromAsync(async () => {
+        throw new Error()
+      }),
     ).toEqual(Option.None)
 
     expect(
-      await Option.wrap(() => {
+      await Option.fromAsync(() => {
         return new Promise(() => {
           throw new Error()
         })
-      }).promise(),
+      }),
     ).toEqual(Option.None)
 
     // chain async function
-    expect(
-      await Option.wrap(async () => 1)
-        .map(async (n) => 1 + (await n))
-        .promise(),
-    ).toEqual(Option.Some(2))
+    expect(await Option.fromAsync(async () => 1).map((n) => 1 + n)).toEqual(
+      Option.Some(2),
+    )
 
     expect(
-      await Option.wrap(async () => {
+      await Option.fromAsync(async () => {
         throw new Error()
-      })
-        .map(async (n) => 1 + (await n))
-        .promise(),
+      }).map((n) => 1 + n),
     ).toEqual(Option.None)
   })
 })

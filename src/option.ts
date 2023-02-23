@@ -7,7 +7,7 @@ import {
   noop,
   createIteratorOn,
 } from './common'
-import { Result } from './result'
+import { AsyncResult, AsyncResultImpl, Result } from './result'
 
 /**
  * # Description
@@ -131,6 +131,12 @@ export interface Option<T> {
    * Some languages call this operation flatmap.
    */
   andThen<U>(this: Option<T>, f: (v: T) => Option<U>): Option<U>
+
+  /**
+   * Transforms the `Option` into a `AsyncOption`.
+   */
+  async(this: Option<T>): AsyncOption<Awaited<T>>
+
   /**
    * When is `Some`:
    * - returns the contained value.
@@ -222,13 +228,6 @@ export interface Option<T> {
   orElse(this: Option<T>, other: () => Option<T>): Option<T>
 
   /**
-   * Transforms the `Option` into a `Promise<Option>`.
-   *
-   * The final `Option` will be `None` if any error raised in the `Promise`.
-   */
-  promise(this: Option<T>): Promise<Option<Awaited<T>>>
-
-  /**
    * Behaves like {@link expect}, but using a fixed error message when it is a `None`.
    */
   unwrap(this: Option<T>): T
@@ -281,6 +280,18 @@ class SomeImpl<T> implements Some<T> {
 
   andThen<U>(f: (v: T) => Option<U>): Option<U> {
     return f(this[Value])
+  }
+
+  async(): AsyncOption<Awaited<T>> {
+    if (isPromise(this[Value])) {
+      return new AsyncOptionImpl(
+        this[Value].then(
+          (val) => new SomeImpl(val),
+          () => Option.None,
+        ),
+      )
+    }
+    return new AsyncOptionImpl(Promise.resolve(this as Option<Awaited<T>>))
   }
 
   expect(message: string | Error | (() => string | Error)): T {
@@ -341,16 +352,6 @@ class SomeImpl<T> implements Some<T> {
     return this
   }
 
-  promise(): Promise<Option<Awaited<T>>> {
-    if (isPromise(this[Value])) {
-      return this[Value].then(
-        (val) => new SomeImpl(val),
-        () => Option.None,
-      )
-    }
-    return Promise.resolve(this as Option<Awaited<T>>)
-  }
-
   unwrap(): T {
     return this[Value]
   }
@@ -380,6 +381,10 @@ class NoneImpl<T> implements None<T> {
 
   andThen<U>(f: (v: T) => Option<U>): Option<U> {
     return this as unknown as Option<U>
+  }
+
+  async(): AsyncOption<Awaited<T>> {
+    return new AsyncOptionImpl(Promise.resolve(Option.None))
   }
 
   expect(
@@ -443,10 +448,6 @@ class NoneImpl<T> implements None<T> {
     return other()
   }
 
-  promise(): Promise<Option<Awaited<T>>> {
-    return Promise.resolve(Option.None)
-  }
-
   unwrap(): T {
     return this.expect('expect a Some, but got a None', this.unwrap)
   }
@@ -469,6 +470,185 @@ class NoneImpl<T> implements None<T> {
 }
 
 /**
+ * Async version of {@link Option}
+ */
+export interface AsyncOption<T> extends PromiseLike<Option<T>> {
+  and<U>(this: AsyncOption<T>, other: Option<U>): AsyncOption<U>
+
+  andThen<U>(
+    this: AsyncOption<T>,
+    f: (v: T) => Promise<Option<U>> | Option<U>,
+  ): AsyncOption<U>
+
+  expect(
+    this: AsyncOption<T>,
+    message: string | Error | (() => Error),
+  ): Promise<T>
+
+  filter(
+    this: AsyncOption<T>,
+    predicate: (v: T) => Promise<boolean> | boolean,
+  ): AsyncOption<T>
+
+  iter(this: AsyncOption<T>): Promise<IterableIterator<T>>
+
+  map<U>(this: AsyncOption<T>, f: (v: T) => Promise<U> | U): AsyncOption<U>
+
+  mapOr<U>(
+    this: AsyncOption<T>,
+    def: U,
+    f: (v: T) => Promise<U> | U,
+  ): Promise<U>
+
+  mapOrElse<U>(
+    this: AsyncOption<T>,
+    d: () => Promise<U> | U,
+    f: (v: T) => Promise<U> | U,
+  ): Promise<U>
+
+  okOr<E>(this: AsyncOption<T>, err: E): AsyncResult<T, E>
+
+  okOrElse<E>(
+    this: AsyncOption<T>,
+    err: () => Promise<E> | E,
+  ): AsyncResult<T, E>
+
+  or(this: AsyncOption<T>, other: Option<T>): AsyncOption<T>
+
+  orElse(
+    this: AsyncOption<T>,
+    other: () => Promise<Option<T>> | Option<T>,
+  ): AsyncOption<T>
+
+  unwrap(this: AsyncOption<T>): Promise<T>
+
+  unwrapOr(this: AsyncOption<T>, def: T): Promise<T>
+
+  unwrapOrElse(this: AsyncOption<T>, d: () => Promise<T> | T): Promise<T>
+
+  unwrapUnchecked(this: AsyncOption<T>): Promise<T | undefined>
+
+  zip<U>(this: AsyncOption<T>, other: AsyncOption<U>): AsyncOption<[T, U]>
+}
+
+export class AsyncOptionImpl<T> implements AsyncOption<T> {
+  private readonly [Value]: Promise<Option<T>>
+
+  constructor(value: Promise<Option<T>>) {
+    this[Value] = value
+  }
+
+  and<U>(other: Option<U>): AsyncOption<U> {
+    return new AsyncOptionImpl(this[Value].then((opt) => opt.and(other)))
+  }
+
+  andThen<U>(f: (v: T) => Promise<Option<U>> | Option<U>): AsyncOption<U> {
+    // Promise awaits nested promises automatically
+    // so `as any` is safe
+    return new AsyncOptionImpl(this[Value].then((opt) => opt.andThen(f as any)))
+  }
+
+  expect(
+    message: string | Error | (() => Error),
+    ref = this.expect,
+  ): Promise<T> {
+    return this[Value].then((opt: SomeImpl<T> | NoneImpl<T>) => {
+      if (opt instanceof SomeImpl) return opt.into()
+      return opt.expect(message, ref)
+    })
+  }
+
+  filter(predicate: (v: T) => Promise<boolean> | boolean): AsyncOption<T> {
+    return new AsyncOptionImpl(
+      this[Value].then(async (opt) => {
+        if (opt.isSome() && (await predicate(opt.into()))) {
+          return opt
+        }
+        return Option.None
+      }),
+    )
+  }
+
+  iter(): Promise<IterableIterator<T>> {
+    return this[Value].then((opt) => opt.iter())
+  }
+
+  map<U>(f: (v: T) => Promise<U> | U): AsyncOption<U> {
+    return new AsyncOptionImpl(
+      this[Value].then(async (opt) => {
+        if (opt.isSome()) return Option.Some(await f(opt.into()))
+        return Option.None
+      }),
+    )
+  }
+
+  mapOr<U>(def: U, f: (v: T) => Promise<U> | U): Promise<U> {
+    return this[Value].then((opt) => opt.mapOr(def, f))
+  }
+
+  mapOrElse<U>(
+    d: () => Promise<U> | U,
+    f: (v: T) => Promise<U> | U,
+  ): Promise<U> {
+    return this[Value].then((opt) => opt.mapOrElse(d, f))
+  }
+
+  okOr<E>(err: E): AsyncResult<T, E> {
+    return new AsyncResultImpl(this[Value].then((opt) => opt.okOr(err)))
+  }
+
+  okOrElse<E>(err: () => Promise<E> | E): AsyncResult<T, E> {
+    // Promise awaits nested promises automatically
+    // so `as any` is safe
+    return new AsyncResultImpl(
+      this[Value].then((opt) => opt.okOrElse(err as any)),
+    )
+  }
+
+  or(other: Option<T>): AsyncOption<T> {
+    return new AsyncOptionImpl(this[Value].then((opt) => opt.or(other)))
+  }
+
+  orElse(other: () => Promise<Option<T>> | Option<T>): AsyncOption<T> {
+    // Promise awaits nested promises automatically
+    // so `as any` is safe
+    return new AsyncOptionImpl(
+      this[Value].then((opt) => opt.orElse(other as any)),
+    )
+  }
+
+  then<R>(
+    onfulfilled?: ((value: Option<T>) => R | PromiseLike<R>) | undefined | null,
+  ): PromiseLike<R> {
+    return this[Value].then(onfulfilled)
+  }
+
+  unwrap(): Promise<T> {
+    return this.expect('expect a Some, but got a None', this.unwrap)
+  }
+
+  unwrapOr(def: T): Promise<T> {
+    return this[Value].then((opt) => opt.unwrapOr(def))
+  }
+
+  unwrapOrElse(d: () => Promise<T> | T): Promise<T> {
+    // Promise awaits nested promises automatically
+    // so `as any` is safe
+    return this[Value].then((opt) => opt.unwrapOrElse(d as any))
+  }
+
+  unwrapUnchecked(): Promise<T | undefined> {
+    return this[Value].then((opt) => opt.unwrapUnchecked())
+  }
+
+  zip<U>(other: AsyncOptionImpl<U>): AsyncOption<[T, U]> {
+    return new AsyncOptionImpl(
+      Promise.all([this[Value], other[Value]]).then(([a, b]) => a.zip(b)),
+    )
+  }
+}
+
+/**
  * The Option type.
  * See the interface {@link Option} for more.
  */
@@ -487,10 +667,15 @@ export const Option = {
   is: (val: unknown): val is Option<any> =>
     val instanceof SomeImpl || val instanceof NoneImpl,
   /**
-   * Get an `Option` from executing a closure.
-   * Returns `None` only when the execution throws an Error (the Error will be ignored).
+   * Check if a value is an `AsyncOption`
    */
-  wrap<T>(fn: () => T): Option<T> {
+  isAsync: (val: unknown): val is AsyncOption<any> =>
+    val instanceof AsyncOptionImpl,
+  /**
+   * Get an `Option` from executing a closure.
+   * Returns `None` if the execution throws an Error (the Error will be ignored).
+   */
+  from<T>(fn: () => T): Option<T> {
     try {
       const result = fn()
       if (isPromise(result)) {
@@ -499,6 +684,26 @@ export const Option = {
       return new SomeImpl(result)
     } catch {
       return Option.None
+    }
+  },
+  /**
+   * Get an `AsyncOption` from executing a closure.
+   * Returns `None` if the promise is rejected (the Error will be ignored).
+   */
+  fromAsync<T>(fn: () => Promise<T>): AsyncOption<T> {
+    try {
+      const result = fn()
+      if (isPromise(result)) {
+        return new AsyncOptionImpl(
+          result.then(
+            (res) => Option.Some(res),
+            () => Option.None,
+          ),
+        )
+      }
+      return new AsyncOptionImpl(Promise.resolve(Option.Some(result)))
+    } catch {
+      return new AsyncOptionImpl(Promise.resolve(Option.None))
     }
   },
 } as const
