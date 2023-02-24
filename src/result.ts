@@ -802,28 +802,37 @@ export class AsyncResultImpl<T, E> implements AsyncResult<T, E> {
 }
 
 /**
- * The Result type.
- * See the interface {@link Result} for more.
+ * See type {@link Result} for more.
  */
-export const Result = {
+export namespace Result {
   /**
    * Contains the success value
    */
-  Ok: <T, E = Error>(value: T) => new OkImpl(value) as Result<T, E>,
+  export function Ok<T, E = Error>(value: T): Result<T, E> {
+    return new OkImpl(value)
+  }
+
   /**
    * Contains the error value
    */
-  Err: <T, E>(err: E) => new ErrImpl(err) as Result<T, E>,
+  export function Err<T, E>(err: E): Result<T, E> {
+    return new ErrImpl(err)
+  }
+
   /**
    * Check if a value is an `Result`
    */
-  is: (val: unknown): val is Result<any, any> =>
-    val instanceof OkImpl || val instanceof ErrImpl,
+  export function is(val: unknown): val is Result<any, any> {
+    return val instanceof OkImpl || val instanceof ErrImpl
+  }
+
   /**
    * Check if a value is an `AsyncResult`
    */
-  isAsync: (val: unknown): val is AsyncResult<any, any> =>
-    val instanceof AsyncResultImpl,
+  export function isAsync(val: unknown): val is AsyncResult<any, any> {
+    return val instanceof AsyncResultImpl
+  }
+
   /**
    * Get a `Result` from executing a closure.
    * Returns `Err` if the execution throws an Error.
@@ -831,7 +840,7 @@ export const Result = {
    * **Note** Passing an async closure should be avoided unless it's intended to,
    * because it always returns a `Ok` as async closure always returns a `Promise`
    */
-  from<T, E = Error>(fn: () => T): Result<T, E> {
+  export function from<T, E = Error>(fn: () => T): Result<T, E> {
     try {
       const result = fn()
       if (isPromise(result)) {
@@ -841,12 +850,13 @@ export const Result = {
     } catch (e) {
       return new ErrImpl(e as E)
     }
-  },
+  }
+
   /**
    * Get an `AsyncResult` from executing a closure.
    * Returns `Err` if the promise is rejected.
    */
-  fromAsync<T, E = Error, F = Error>(
+  export function fromAsync<T, E = Error, F = Error>(
     fn: () => Promise<T> | T,
   ): AsyncResult<T, E | F> {
     try {
@@ -863,7 +873,8 @@ export const Result = {
     } catch (e) {
       return new AsyncResultImpl(Promise.resolve(Result.Err(e as E)))
     }
-  },
+  }
+
   /**
    * Wraps a function to return an `Result`.
    *
@@ -871,17 +882,18 @@ export const Result = {
    * because the wrapped function will always return an `Ok`
    * as async closure always returns a `Promise`
    */
-  wrap<T, E = Error, A extends any[] = any[]>(
+  export function wrap<T, E = Error, A extends any[] = any[]>(
     fn: (...args: A) => T,
   ): (...args: A) => Result<T, E> {
     return (...args) => Result.from(() => fn(...args))
-  },
+  }
+
   /**
    * Wraps an async function to return an `AsyncResult`.
    */
-  wrapAsync<T, E = Error, F = Error, A extends any[] = any[]>(
+  export function wrapAsync<T, E = Error, F = Error, A extends any[] = any[]>(
     fn: (...args: A) => Promise<T> | T,
   ): (...args: A) => AsyncResult<T, E | F> {
     return (...args) => Result.fromAsync(() => fn(...args))
-  },
-} as const
+  }
+}

@@ -722,28 +722,35 @@ export class AsyncOptionImpl<T> implements AsyncOption<T> {
 }
 
 /**
- * The Option type.
- * See the interface {@link Option} for more.
+ * See type {@link Option} for more.
  */
-export const Option = {
+export namespace Option {
   /**
    * Some value of type `T`.
    */
-  Some: <T>(value: T) => new SomeImpl(value) as Option<T>,
+  export function Some<T>(value: T): Option<T> {
+    return new SomeImpl(value)
+  }
+
   /**
    * No value.
    */
-  None: new NoneImpl<any>() as Option<any>,
+  export const None: Option<any> = new NoneImpl<any>()
+
   /**
    * Check if a value is an `Option`
    */
-  is: (val: unknown): val is Option<any> =>
-    val instanceof SomeImpl || val instanceof NoneImpl,
+  export function is(val: unknown): val is Option<any> {
+    return val instanceof SomeImpl || val instanceof NoneImpl
+  }
+
   /**
    * Check if a value is an `AsyncOption`
    */
-  isAsync: (val: unknown): val is AsyncOption<any> =>
-    val instanceof AsyncOptionImpl,
+  export function isAsync(val: unknown): val is AsyncOption<any> {
+    return val instanceof AsyncOptionImpl
+  }
+
   /**
    * Get an `Option` from executing a closure.
    * Returns `None` if the execution throws an Error (the Error will be ignored).
@@ -751,7 +758,7 @@ export const Option = {
    * **Note** Passing an async closure should be avoided unless it's intended to,
    * because it always returns a `Some` as async closure always returns a `Promise`
    */
-  from<T>(fn: () => T): Option<T> {
+  export function from<T>(fn: () => T): Option<T> {
     try {
       const result = fn()
       if (isPromise(result)) {
@@ -761,12 +768,13 @@ export const Option = {
     } catch {
       return Option.None
     }
-  },
+  }
+
   /**
    * Get an `AsyncOption` from executing a closure.
    * Returns `None` if the promise is rejected (the Error will be ignored).
    */
-  fromAsync<T>(fn: () => Promise<T> | T): AsyncOption<T> {
+  export function fromAsync<T>(fn: () => Promise<T> | T): AsyncOption<T> {
     try {
       const result = fn()
       if (isPromise(result)) {
@@ -781,7 +789,8 @@ export const Option = {
     } catch {
       return new AsyncOptionImpl(Promise.resolve(Option.None))
     }
-  },
+  }
+
   /**
    * Wraps a function to return an `Option`.
    *
@@ -789,17 +798,18 @@ export const Option = {
    * because the wrapped function will always return a `Some`
    * as async function always returns a `Promise`
    */
-  wrap<T, A extends any[] = any[]>(
+  export function wrap<T, A extends any[] = any[]>(
     fn: (...args: A) => T,
   ): (...args: A) => Option<T> {
     return (...args) => Option.from(() => fn(...args))
-  },
+  }
+
   /**
    * Wraps an async function to return an `AsyncOption`.
    */
-  wrapAsync<T, A extends any[] = any[]>(
+  export function wrapAsync<T, A extends any[] = any[]>(
     fn: (...args: A) => Promise<T> | T,
   ): (...args: A) => AsyncOption<T> {
     return (...args) => Option.fromAsync(() => fn(...args))
-  },
-} as const
+  }
+}
