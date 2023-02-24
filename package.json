@@ -4,6 +4,7 @@
   "author": "unbyte <i@shangyes.net>",
   "license": "MIT",
   "type": "module",
+  "description": "The Result and Option for Javascript/Typescript.",
   "keywords": [
     "fp",
     "result",

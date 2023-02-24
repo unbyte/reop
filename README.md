@@ -1,22 +1,24 @@
 <h1 align="center">ReOp</h1>
 
 <p align="center">
-<img alt="npm" src="https://img.shields.io/npm/v/reop?style=flat-square">
+<a href="https://www.npmjs.com/package/reop"><img alt="npm" src="https://img.shields.io/npm/v/reop?style=flat-square"></a>
 <img alt="GitHub" src="https://img.shields.io/github/license/unbyte/reop?style=flat-square">
 <img alt="Codecov" src="https://img.shields.io/codecov/c/github/unbyte/reop?style=flat-square">
 <img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/unbyte/reop/ci.yaml?style=flat-square">
 </p>
 
 <p align="center">
-A port of <b>Result</b> and <b>Option</b> from Rust with ergonomic optimization, for Javascript / Typescript.
+The Result and Option for Javascript/Typescript.
 </p>
 
 <h2 align="center">Documentation</h2>
 
-Basically you can fully use your familiar API from Rust, for each API and corresponding description, see [documentation](https://paka.dev/npm/reop@latest).
+The library's API is similar to Rust's, 
+but integrates with the asynchronous language of Javascript.
 
-In addition to things from Rust, this library also provides the convenience 
-of interoperation between sync and async code.
+Here assumes you have already known the usage of `Result` and `Option` in Rust,
+so [complicated API descriptions](https://paka.dev/npm/reop@latest) can be skipped,
+and the uniqueness of this library can be obvious.
 
 Consider we are looking for the entry path of a npm package,
 and we don't care what error occurs:
@@ -26,27 +28,24 @@ import { Result } from 'reop'
 import { resolve } from 'node:path'
 import { readJson, exists } from 'fs-extra'
 
-// ↓ Option<string>
-const entry = 
-  await Result
-    .fromAsync(() => readJson(resolve(pkgPath, './package.json'))) // any error will be caught in Result::Err
-    .ok() // turn to AsyncOption
+const entry = await Option
+    .fromAsync(() => readJson(resolve(pkgPath, './package.json'))) // errors are caught as Option::None
     .map((pkg) => resolve(pkgPath, pkg.main))
     .filter((entry) => exists(entry)) // an async filter
+    .iter() // does the same as what Option::iter in Rust does
 
-for (const path of entry.iter()) {
-    // do magic
+for (const path of entry) {
+    // ...
 }
 ```
 
 Or using `wrap` helpers:
 
 ```javascript
-const readJsonResult = Result.wrapAsync(readJson)
+const readJsonOptional = Option.wrapAsync(readJson) // like what promisify() does
 
-// ↓ Option<string>
-const entry = await readJsonResult(resolve(pkgPath, './package.json'))
-    .ok()
+const entry = await readJsonOptional(resolve(pkgPath, './package.json'))
     .map((pkg) => resolve(pkgPath, pkg.main))
     .filter((entry) => exists(entry))
+    .iter()
 ```
