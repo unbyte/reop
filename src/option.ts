@@ -98,21 +98,18 @@ import { AsyncResult, AsyncResultImpl, Result } from './result'
  *
  *
  * ## Iterating over Option
- * An `Option` can be iterated over. This can be helpful if you need an iterator that is conditionally empty.
+ * An `Option` can be iterated over by {@link iter}.
+ * This can be helpful if you need an iterator that is conditionally empty.
  * The iterator will either produce a single value (when the `Option` is `Some`),
  * or produce no values (when the `Option` is `None`).
  *
- * ```javascript
- * const none = Option.None
- * for (const v of none.iter()) {
- *   console.log('unreachable', v)
- * }
  *
- * const some = Option.some(1)
- * for (const v of some.iter()) {
- *   console.log(v) // 1
- * }
- * ```
+ * ## Async and await
+ * An `Option` can be turned into an {@link AsyncOption}, with which you can treat
+ * `Option<Promise<U>>` like `Option<U>`, using {@link async} method,
+ * and {@link AsyncOption} can be turned back into an `Option` using [await]{@link AsyncOption.await} method.
+ *
+ * For more, see {@link AsyncOption}.
  */
 export interface Option<T> {
   /**

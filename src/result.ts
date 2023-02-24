@@ -101,21 +101,19 @@ import {
  *
  *
  * ## Iterating over Result
- * A `Result` can be iterated over. This can be helpful if you need an iterator that is conditionally empty.
+ * A `Result` can be iterated over by {@link iter}.
+ * This can be helpful if you need an iterator that is conditionally empty.
  * The iterator will either produce a single value (when the `Result` is `Ok`),
  * or produce no values (when the `Result` is `Err`).
  *
- * ```javascript
- * const err = Result.Err(new Error())
- * for (const v of err.iter()) {
- *   console.log('unreachable', v)
- * }
  *
- * const ok = Result.Ok(1)
- * for (const v of ok.iter()) {
- *   console.log(v) // 1
- * }
- * ```
+ * ## Async and await
+ * A `Result` can be turned into an {@link AsyncResult}, with which you can treat
+ * `Result<Promise<U>, E>` like `Result<U, E | F>` where `F` comes from the possible
+ * error thrown in the Promise, using {@link async} method,
+ * and {@link AsyncResult} can be turned back into a `Result` using [await]{@link AsyncResult.await} method.
+ *
+ * For more, see {@link AsyncResult}.
  */
 export interface Result<T, E> {
   /**
